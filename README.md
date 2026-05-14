@@ -8,7 +8,7 @@ Compares Scrap.tf prices with Backpack.tf buy orders and shows real profit direc
 
 # Preview
 
-![Preview](screen.png)
+![Preview](screenshots/screen.png)
 
 ---
 
