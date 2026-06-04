@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TF2 ScrapTF Profit Helper
-// @namespace    https://steamcommunity.com/profiles/76561198201055179
-// @version      1.0
+// @namespace    https://github.com/VeBeshka/tf2-scraptf-profit-helper
+// @version      1.2
 // @author       VeBeshka
 // @description  Scrap.tf profit checker with Backpack.tf buy order comparison
 // @icon         https://raw.githubusercontent.com/VeBeshka/tf2-scraptf-profit-helper/main/icon.png
@@ -25,7 +25,7 @@
 
     const KEY_PRICE = 54.49;
     const CHECKED_CLASS = 'vbp-initialized';
-    const CACHE_KEY = 'vbp_bp_price_cache_v21';
+    const CACHE_KEY = 'vbp_bp_price_cache_v23';
     const CACHE_TTL = 30 * 60 * 1000;
 
     const AUTO_CHECK_DELAY = 120;
@@ -42,7 +42,9 @@
         'vbp_bp_price_cache_v7',
         'vbp_bp_price_cache_v8',
         'vbp_bp_price_cache_v9',
-        'vbp_bp_price_cache_v20'
+        'vbp_bp_price_cache_v20',
+        'vbp_bp_price_cache_v21',
+        'vbp_bp_price_cache_v22'
     ].forEach(k => localStorage.removeItem(k));
 
     const QUALITY_MAP = {
@@ -68,6 +70,121 @@
         'Decorated Weapon',
         'Normal'
     ];
+
+    const UNUSUAL_EFFECTS = {
+        'green confetti': 6,
+        'purple confetti': 7,
+        'haunted ghosts': 8,
+        'green energy': 9,
+        'purple energy': 10,
+        'circling tf logo': 11,
+        'massed flies': 12,
+        'burning flames': 13,
+        'scorching flames': 14,
+        'searing plasma': 15,
+        'vivid plasma': 16,
+        'sunbeams': 17,
+        'circling peace sign': 18,
+        'circling heart': 19,
+        'map stamps': 20,
+        'genteel smoke': 28,
+        'stormy storm': 29,
+        'blizzardy storm': 30,
+        'nuts n bolts': 31,
+        'orbiting planets': 32,
+        'orbiting fire': 33,
+        'bubbling': 34,
+        'smoking': 35,
+        'steaming': 36,
+        'flaming lantern': 37,
+        'cloudy moon': 38,
+        'cauldron bubbles': 39,
+        'eerie orbiting fire': 40,
+        'knifestorm': 43,
+        'misty skull': 44,
+        'harvest moon': 45,
+        "it's a secret to everybody": 46,
+        'stormy 13th hour': 47,
+        'aces high': 59,
+        'kill-a-watt': 60,
+        'terror-watt': 61,
+        'cloud 9': 62,
+        'a time bomb': 70,
+        'green black hole': 71,
+        'roboactive': 72,
+        'arcana': 73,
+        'spellbound': 74,
+        'chiroptera venenata': 75,
+        'poisoned shadows': 76,
+        'something burning this way comes': 77,
+        'hellfire': 78,
+        'darkblaze': 79,
+        'demonflame': 80,
+        'bonzo the all-gnawing': 81,
+        'amaranthine': 82,
+        'stare from beyond': 83,
+        'the ooze': 84,
+        'ghastly ghost': 85,
+        'haunted phantasm': 86,
+        'frostbite': 87,
+        'molten mallard': 88,
+        'morning glory': 89,
+        'death at dusk': 90,
+        'abduction': 91,
+        'atomic': 92,
+        'subatomic': 93,
+        'electric hat protector': 94,
+        'magnetic hat protector': 95,
+        'voltaic hat protector': 96,
+        'galactic codex': 97,
+        'ancient codex': 98,
+        'nebula': 99,
+        'death by disco': 100,
+        'phosphorous': 101,
+        'sulphurous': 102,
+        'memory leak': 103,
+        'overclocked': 104,
+        'electrostatic': 105,
+        'power surge': 106,
+        'anti-freeze': 107,
+        'time warp': 108,
+        'green ray': 109,
+        'green sunbeams': 110,
+        'frosted star': 111,
+        'hellish inferno': 112,
+        'burning red': 113,
+        'red lightning': 114,
+        'sinister lightning': 115,
+        'hellfire storm': 116,
+        'tornado': 117,
+        'flaming tornado': 118,
+        'green gibus': 119,
+        'scorching flames circling peace sign': 120,
+        'phosphorous burning flames': 121,
+        'spooky storm': 122,
+        'spellbound aspect': 123,
+        'static mist': 124,
+        'ether trail': 125,
+        'nether trail': 126,
+        'ancient eldritch': 127,
+        'eldritch flame': 128,
+        'neutron star': 129,
+        'starstorm slumber': 130,
+        'starstorm insomnia': 131,
+        'volcanic eruption': 132,
+        'tesla coil': 133,
+        'stardust': 134,
+        'starry orbit': 135,
+        'sulphurous smoke': 136,
+        'phosphorous smoke': 137,
+        'green tornado': 138,
+        'green energy orb': 139,
+        'roboactive orb': 140,
+        'time warp orb': 141,
+        'arcana orb': 142,
+        'burning flames orb': 143,
+        'scorching flames orb': 144
+    };
 
     let autoQueue = [];
     let autoRunning = false;
@@ -101,6 +218,10 @@
             .trim();
     }
 
+    function escapeRegExp(text) {
+        return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
     function cleanName(rawHtml) {
         const div = document.createElement('div');
         div.innerHTML = rawHtml || '';
@@ -112,6 +233,7 @@
             const match = cls.match(/^quality(\d+)$/);
             if (match) return Number(match[1]);
         }
+
         return 6;
     }
 
@@ -123,27 +245,47 @@
         for (const [id, q] of Object.entries(QUALITY_MAP)) {
             if (q === name) return id;
         }
+
         return 6;
     }
 
-    function stripQualityPrefix(name) {
+    function getUnusualEffectName(item) {
+        const rawName = cleanName(item.dataset.title).toLowerCase();
+        const content = String(item.dataset.content || '').toLowerCase();
+
+        const effects = Object.keys(UNUSUAL_EFFECTS).sort((a, b) => b.length - a.length);
+
+        for (const effect of effects) {
+            if (rawName.startsWith(effect + ' ')) return effect;
+        }
+
+        for (const effect of effects) {
+            if (content.includes(effect)) return effect;
+        }
+
+        return null;
+    }
+
+    function stripQualityAndEffectPrefix(name) {
         let out = String(name || '').trim();
 
         for (const q of QUALITY_PREFIXES) {
-            const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            out = out.replace(new RegExp(`^${escaped}\\s+`, 'i'), '');
+            out = out.replace(new RegExp(`^${escapeRegExp(q)}\\s+`, 'i'), '');
         }
 
         out = out.replace(/^Festivized\s+/i, '');
+
+        const effects = Object.keys(UNUSUAL_EFFECTS).sort((a, b) => b.length - a.length);
+
+        for (const effect of effects) {
+            out = out.replace(new RegExp(`^${escapeRegExp(effect)}\\s+`, 'i'), '');
+        }
 
         return out.trim();
     }
 
     function isFestivizedScrapItem(item) {
-        const text = String(
-            `${item.dataset.content || ''} ${item.dataset.title || ''}`
-        ).toLowerCase();
-
+        const text = String(`${item.dataset.content || ''} ${item.dataset.title || ''}`).toLowerCase();
         return text.includes('festivized');
     }
 
@@ -152,7 +294,9 @@
         const quality = getQualityName(item);
         const qualityId = getQualityId(item);
         const festivized = isFestivizedScrapItem(item);
-        const baseName = stripQualityPrefix(rawName);
+        const effectName = quality === 'Unusual' ? getUnusualEffectName(item) : null;
+        const effectId = effectName ? UNUSUAL_EFFECTS[effectName] : null;
+        const baseName = stripQualityAndEffectPrefix(rawName);
 
         return {
             rawName,
@@ -160,8 +304,19 @@
             qualityId,
             baseName,
             festivized,
-            cacheKey: `${quality}:${normalizeName(baseName)}:${festivized ? 'festivized' : 'normal'}`
+            effectName,
+            effectId,
+            cacheKey: `${quality}:${normalizeName(baseName)}:${festivized ? 'festivized' : 'normal'}:${effectId || 'noeffect'}`
         };
+    }    function makeBackpackStatsUrl(info) {
+        const quality = encodeURIComponent(info.quality);
+        const item = encodeURIComponent(info.baseName);
+
+        if (info.quality === 'Unusual' && info.effectId) {
+            return `https://backpack.tf/stats/${quality}/${item}/Tradable/Craftable/${info.effectId}`;
+        }
+
+        return `https://backpack.tf/stats/${quality}/${item}/Tradable/Craftable`;
     }
 
     function loadCache() {
@@ -236,74 +391,73 @@
     }
 
     function isCleanBuyOrder(listingElement) {
-    const fullText = String(listingElement?.textContent || '').toLowerCase();
+        const fullText = String(listingElement?.textContent || '').toLowerCase();
 
-    const bad = [
-        'painted',
-        'painted hats',
-        'painted items',
+       const bad = [
+    'painted',
+    'painted hats',
+    'painted items',
 
-        'black ',
-        'pink ',
-        'lime ',
-        'white ',
-        'purple ',
-        'gold ',
-        'after eight',
-        'team spirit',
-        'australium gold',
-        'a distinctive lack of hue',
+    'black ',
+    'pink ',
+    'lime ',
+    'white ',
+    'purple ',
+    'gold ',
+    'after eight',
+    'team spirit',
+    'australium gold',
 
-        'spell',
-        'spelled',
-        'exorcism',
-        'voices from below',
-        'pumpkin bombs',
-        'footprints',
+    'spell',
+    'spelled',
+    'footprints',
+    'parts attached',
+    'strange part',
 
-        'parts attached',
-        'strange part',
-        'strange parts',
+    'cash',
+    'paypal',
+    'usd',
 
-        'killstreak',
-        'specialized',
-        'professional',
-        'sheen',
+    'listed price',
+    'c/c',
 
-        'effect',
-        'unusual',
+    'buy any effect',
+    'any effect',
+    'depending on price',
+    'can buy any',
+    'buying any',
+    'paying more than anyone',
+    'price depends',
+    'negotiable',
 
-        'mint',
-        'clean mint',
+    'inventory',
+    'backpacks',
+    'human',
 
-        'cash',
-        'paypal',
-        'usd',
-        '$',
+    'clean mint',
+    'only mint'
+];
 
-        'listed price',
-        'c/c',
-        ' cc '
-    ];
+        if (bad.some(word => fullText.includes(word))) return false;
 
-    if (bad.some(word => fullText.includes(word))) {
-        return false;
+        if (/\b(lvl|level)\s*\d{1,3}\b/i.test(fullText)) return false;
+        if (/\b\d{1,3}\s*(lvl|level)\b/i.test(fullText)) return false;
+
+        return true;
     }
-
-// ===== LVL FILTERS =====
-
-if (/\b(lvl|level)\s*\d{1,3}\b/i.test(fullText)) return false;
-if (/\b\d{1,3}\s*(lvl|level)\b/i.test(fullText)) return false;
-
-    return true;
-}
 
     function makeClassifiedsUrl(info, page = 1) {
         const item = encodeURIComponent(info.baseName);
         const qualityId = getQualityIdFromName(info.quality);
         const festivizedValue = info.festivized ? 1 : -1;
 
-        return `https://backpack.tf/classifieds?page=${page}&item=${item}&quality=${qualityId}&tradable=1&craftable=1&australium=-1&killstreak_tier=0&festivized=${festivizedValue}`;
+        let url = `https://backpack.tf/classifieds?page=${page}&item=${item}&quality=${qualityId}&tradable=1&craftable=1&australium=-1&killstreak_tier=0&festivized=${festivizedValue}`;
+
+        if (info.quality === 'Unusual' && info.effectId) {
+            url += `&particle=${info.effectId}`;
+        }
+
+        return url;
     }
 
     function fetchUrl(url) {
@@ -319,11 +473,17 @@ if (/\b\d{1,3}\s*(lvl|level)\b/i.test(fullText)) return false;
         });
     }
 
-    function priceLooksReasonable(price, scrapPrice) {
+    function priceLooksReasonable(price, scrapPrice, info) {
         if (price === null) return false;
         if (price <= 0) return false;
-        if (price > 300) return false;
 
+        if (info.quality === 'Unusual') {
+            if (price > scrapPrice + 80) return false;
+            if (price < 1) return false;
+            return true;
+        }
+
+        if (price > 300) return false;
         if (scrapPrice < 5 && price > 8) return false;
         if (scrapPrice < 10 && price > 20) return false;
         if (price > scrapPrice * 3 && price > scrapPrice + 5) return false;
@@ -337,23 +497,28 @@ if (/\b\d{1,3}\s*(lvl|level)\b/i.test(fullText)) return false;
         const cleanPrices = [];
         const targetName = normalizeName(info.baseName);
 
-        const buyItems = [
-            ...doc.querySelectorAll('.listing .item[data-listing_intent="buy"]')
-        ];
+        const buyItems = [...doc.querySelectorAll('.listing .item[data-listing_intent="buy"]')];
 
         for (const item of buyItems) {
             const itemQuality = Number(item.dataset.quality || item.getAttribute('data-quality') || 6);
             if (itemQuality !== info.qualityId) continue;
 
-            const isPainted =
-                item.dataset.paint_price ||
-                item.dataset.paint_hex ||
-                item.querySelector('.paint');
+            if (info.quality !== 'Unusual') {
+                const isPainted =
+                    item.dataset.paint_price ||
+                    item.dataset.paint_hex ||
+                    item.querySelector('.paint');
 
-            if (isPainted) continue;
+                if (isPainted) continue;
+            }
 
             const listingRoot = item.closest('.listing') || item.parentElement;
             const listingText = String(listingRoot?.textContent || '').toLowerCase();
+
+            if (info.quality === 'Unusual' && info.effectName) {
+                if (!listingText.includes(info.effectName)) continue;
+            }
+
             const bpIsFestivized = listingText.includes('festivized');
 
             if (info.festivized && !bpIsFestivized) continue;
@@ -372,10 +537,12 @@ if (/\b\d{1,3}\s*(lvl|level)\b/i.test(fullText)) return false;
             const priceText = item.dataset.listing_price || '';
             if (!priceText) continue;
 
-            if (!isCleanBuyOrder(listingRoot)) continue;
+            if (info.quality !== 'Unusual') {
+                if (!isCleanBuyOrder(listingRoot)) continue;
+            }
 
             const price = parsePriceToRef(priceText);
-            if (!priceLooksReasonable(price, scrapPrice)) continue;
+            if (!priceLooksReasonable(price, scrapPrice, info)) continue;
 
             cleanPrices.push(price);
         }
@@ -475,7 +642,7 @@ if (/\b\d{1,3}\s*(lvl|level)\b/i.test(fullText)) return false;
         `;
 
         badge.title =
-            `${info.quality}${info.festivized ? ' Festivized' : ''} ${info.baseName}\n` +
+            `${info.quality}${info.effectName ? ' ' + info.effectName : ''}${info.festivized ? ' Festivized' : ''} ${info.baseName}\n` +
             `BP buy: ${formatRefWithKeys(bpBuy)}\n` +
             `Scrap: ${formatRefWithKeys(scrapPrice)}\n` +
             `Profit: ${ref(profit)} ref`;
@@ -523,9 +690,12 @@ if (/\b\d{1,3}\s*(lvl|level)\b/i.test(fullText)) return false;
     }
 
     function createButton(item) {
+        if (item.querySelector('.vbp-check-bp')) return;
+
         const btn = document.createElement('button');
+        btn.className = 'vbp-check-bp';
         btn.textContent = 'BP';
-        btn.title = 'Force check backpack.tf';
+        btn.title = 'Force check Backpack.tf price';
         btn.style.cssText = `
             position:absolute;
             top:2px;
@@ -551,6 +721,43 @@ if (/\b\d{1,3}\s*(lvl|level)\b/i.test(fullText)) return false;
 
             item.dataset.vbpQueued = '0';
             checkItem(item, true);
+        };
+
+        item.appendChild(btn);
+    }
+
+    function createOpenBackpackButton(item) {
+        if (item.querySelector('.vbp-open-bp')) return;
+
+        const btn = document.createElement('button');
+        btn.className = 'vbp-open-bp';
+        btn.textContent = '↗';
+        btn.title = 'Open on Backpack.tf';
+        btn.style.cssText = `
+            position:absolute;
+            top:2px;
+            right:2px;
+            z-index:31;
+            font-size:10px;
+            width:20px;
+            height:18px;
+            padding:0;
+            background:#111;
+            color:#fff;
+            border:1px solid #8b5cf6;
+            border-radius:3px;
+            cursor:pointer;
+            font-weight:bold;
+        `;
+
+        btn.onclick = e => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const info = getItemInfo(item);
+            const url = makeBackpackStatsUrl(info);
+
+            window.open(url, '_blank', 'noopener,noreferrer');
         };
 
         item.appendChild(btn);
@@ -619,6 +826,7 @@ if (/\b\d{1,3}\s*(lvl|level)\b/i.test(fullText)) return false;
             item.style.position = 'relative';
 
             createButton(item);
+            createOpenBackpackButton(item);
             makeBadge(item);
         });
 
